@@ -111,6 +111,8 @@ pub struct RegistryUpgradedEvent {
 pub struct MetadataUpdatedEvent {
     /// The unique identifier of the event whose metadata changed.
     pub event_id: String,
+    /// The IPFS CID the event pointed to before this update.
+    pub old_metadata_cid: String,
     /// The new IPFS CID pointing to updated metadata.
     pub new_metadata_cid: String,
     /// The address of the organizer who performed the update.
@@ -343,6 +345,33 @@ pub struct ThresholdUpdatedEvent {
     /// The new approval threshold value.
     pub new_threshold: u32,
     /// The ledger timestamp when the threshold was updated.
+    pub timestamp: u64,
+}
+
+/// Emitted when a new admin is added to the multi-sig configuration.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposedEvent {
+    pub current_admin: Address,
+    pub proposed_admin: Address,
+    pub timestamp: u64,
+}
+
+/// Emitted when a proposed admin has been accepted and is now the active admin.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminTransferredEvent {
+    pub previous_admin: Address,
+    pub new_admin: Address,
+    pub timestamp: u64,
+}
+
+/// Emitted when a pending admin proposal is cancelled.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposalCancelledEvent {
+    pub admin: Address,
+    pub cancelled_proposed_admin: Address,
     pub timestamp: u64,
 }
 
@@ -605,44 +634,25 @@ pub struct DisputeResolvedEvent {
     pub timestamp: u64,
 }
 
-/// Emitted when a new admin is proposed by the current admin.
+/// Emitted when a single ticket is refunded to a guest.
 ///
-/// Published with topic `(AgoraEvent::AdminProposed,)`.
+/// This event is published for every refund operation, carrying complete details
+/// about the refunded ticket including the beneficiary address, amount returned,
+/// and the event/ledger context. The indexer uses this event to keep the off-chain
+/// ledger in sync.
+///
+/// Published with topic `(AgoraEvent::TicketRefunded,)`.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AdminProposedEvent {
-    /// The current admin who made the proposal.
-    pub current_admin: Address,
-    /// The proposed new admin address awaiting acceptance.
-    pub proposed_admin: Address,
-    /// The ledger timestamp when the proposal was made.
-    pub timestamp: u64,
-}
-
-/// Emitted when a proposed admin accepts and becomes the active admin.
-///
-/// Published with topic `(AgoraEvent::AdminTransferred,)`.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AdminTransferredEvent {
-    /// The previous admin address.
-    pub previous_admin: Address,
-    /// The new admin address that accepted the proposal.
-    pub new_admin: Address,
-    /// The ledger timestamp when the transfer was completed.
-    pub timestamp: u64,
-}
-
-/// Emitted when a pending admin proposal is cancelled by the current admin.
-///
-/// Published with topic `(AgoraEvent::AdminProposalCancelled,)`.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AdminProposalCancelledEvent {
-    /// The current admin who cancelled the proposal.
-    pub admin: Address,
-    /// The proposed admin address that was cancelled.
-    pub cancelled_proposed_admin: Address,
-    /// The ledger timestamp when the cancellation occurred.
+pub struct TicketRefundedEvent {
+    /// The unique identifier of the ticket being refunded.
+    pub ticket_id: String,
+    /// The unique identifier of the event the ticket was for.
+    pub event_id: String,
+    /// The wallet address of the ticket holder receiving the refund.
+    pub recipient_address: Address,
+    /// The amount refunded (in stroops, e.g., 10,000,000 stroops = 1 XLM).
+    pub refund_amount: i128,
+    /// The ledger timestamp when the refund was processed.
     pub timestamp: u64,
 }

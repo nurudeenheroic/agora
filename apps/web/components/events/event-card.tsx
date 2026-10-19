@@ -93,6 +93,7 @@ export function EventCard({
                 alt={title}
                 width={227}
                 height={112}
+                loading="lazy"
                 className="object-cover w-full h-auto rounded-lg min-h-[112px] bg-gray-100"
               />
             ) : (
@@ -187,7 +188,7 @@ export function EventCard({
             loading="lazy"
           />
         </div>
-      </div>
+      </motion.div>
     </Link>
   );
 }

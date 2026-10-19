@@ -120,7 +120,7 @@ export function OrganizerComponent({
   return (
     <div className="p-10 pl-45 hidden lg:block bg-base">
       <div className="flex justify-start items-center gap-4 p-5 pb-10">
-        <h1 className="font-semibold md:text-4xl pl-3">Explore organizers</h1>
+        <h1 className="font-semibold md:text-4xl pl-3">{t("exploreOrganizers")}</h1>
         <Image
           src={group}
           alt="User Group Icon"
@@ -166,6 +166,7 @@ export function OrganizerComponent({
                   alt={card.title}
                   height={65}
                   width={65}
+                  loading="lazy"
                   className="relative z-10 border-4 border-black rounded-full object-cover"
                 />
                 <div className="absolute -left-1 top-1 w-15 h-15 bg-white rounded-full z-0" />
@@ -191,7 +192,7 @@ export function OrganizerComponent({
           </Link>
           ))}
         {!isLoading && cardsData.length === 0 && (
-          <p className="text-sm text-black/60">No data available</p>
+          <p className="text-sm text-black/60">{t("noDataAvailable")}</p>
         )}
       </section>
       {!isLoading && organizersToRender.length > VISIBLE_ORGANIZER_COUNT && (

@@ -162,6 +162,8 @@ impl TicketPaymentContract {
     }
 
     /// Returns the current paused state of the contract.
+    ///
+    /// Deprecated: use is_paused instead. Kept for backward compatibility.
     pub fn get_is_paused(env: Env) -> bool {
         is_paused(&env)
     }
@@ -489,6 +491,13 @@ impl TicketPaymentContract {
         get_slippage_bps(&env)
     }
 
+    /// Sets the maximum allowable slippage basis points (must be <= 500). Only callable by admin.
+    pub fn set_slippage(env: Env, bps: u32) -> Result<(), TicketPaymentError> {
+        let admin = get_admin(&env).ok_or(TicketPaymentError::NotInitialized)?;
+        admin.require_auth();
+        set_slippage_bps(&env, bps)
+    }
+
     /// Processes a payment for an event ticket.
     /// The buyer pays for the ticket, but the ticket is owned by the recipient.
     /// If recipient is None, the buyer is also the owner.
@@ -522,7 +531,9 @@ impl TicketPaymentContract {
         // Determine the actual owner of the ticket (recipient or buyer)
         let owner_address = recipient_address.unwrap_or_else(|| buyer_address.clone());
 
-        if let Some(ref ref_addr) = options.referrer {
+        let affiliate_addr_opt = options.affiliate_address.clone().or_else(|| options.referrer.clone());
+
+        if let Some(ref ref_addr) = affiliate_addr_opt {
             if ref_addr == &buyer_address {
                 return Err(TicketPaymentError::SelfReferralNotAllowed);
             }
@@ -649,7 +660,11 @@ impl TicketPaymentContract {
                 .and_then(|v| v.checked_div(1_0000000))
                 .ok_or(TicketPaymentError::ArithmeticError)?;
 
-            let bps = get_slippage_bps(&env) as i128;
+            let bps_u32 = get_slippage_bps(&env);
+            if bps_u32 > crate::storage::MAX_ALLOWED_SLIPPAGE_BPS {
+                return Err(TicketPaymentError::InvalidSlippageBps);
+            }
+            let bps = bps_u32 as i128;
             let min_amount = expected
                 .checked_mul(MAX_BPS as i128 - bps)
                 .and_then(|v| v.checked_div(MAX_BPS as i128))
@@ -754,7 +769,7 @@ impl TicketPaymentContract {
             .checked_sub(total_platform_fee)
             .ok_or(TicketPaymentError::ArithmeticError)?;
 
-        let referral_reward = if let Some(ref ref_addr) = options.referrer {
+        let referral_reward = if let Some(ref ref_addr) = affiliate_addr_opt {
             // Use affiliate-specific rate if registered; otherwise fall back to 20% of platform fee.
             let rate_bps =
                 crate::storage::get_affiliate_rate(&env, &event_id, ref_addr).unwrap_or(2000u32); // default: 20% = 2000 bps
@@ -809,8 +824,8 @@ impl TicketPaymentContract {
             return Err(TicketPaymentError::TransferVerificationFailed);
         }
 
-        // Transfer referral reward if applicable
-        if let Some(ref ref_addr) = options.referrer {
+        // Transfer referral / affiliate commission if applicable
+        if let Some(ref ref_addr) = affiliate_addr_opt {
             if referral_reward > 0 {
                 token_client.transfer(&contract_address, ref_addr, &referral_reward);
             }
@@ -891,7 +906,7 @@ impl TicketPaymentContract {
                 is_soulbound: false,
                 last_checked_in_at: 0,
                 referral_amount: referral_amount_per_ticket,
-                referrer: options.referrer.clone(),
+                referrer: affiliate_addr_opt.clone(),
             };
 
             store_payment(&env, payment);
@@ -2131,11 +2146,15 @@ impl TicketPaymentContract {
             }
         }
 
+        let royalty_bps = crate::resale::get_resale_royalty_bps(&env, payment.event_id.clone());
         let listing = crate::resale::ResaleListing {
             payment_id: payment_id.clone(),
             event_id: payment.event_id.clone(),
             seller: payment.buyer_address.clone(),
             ask_price,
+            price: ask_price,
+            max_price: ask_price,
+            royalty_bps,
             status: crate::resale::ResaleStatus::Active,
             listed_at: env.ledger().timestamp(),
         };
@@ -2304,6 +2323,19 @@ impl TicketPaymentContract {
     ) -> Result<(), TicketPaymentError> {
         require_admin(&env)?;
         crate::resale::set_resale_royalty_bps(&env, event_id, bps)
+    }
+
+    /// Returns the resale royalty percentage (in basis points) for an event.
+    pub fn get_resale_royalty_bps(env: Env, event_id: String) -> u32 {
+        crate::resale::get_resale_royalty_bps(&env, event_id)
+    }
+
+    /// Returns the resale listing for a given payment ID, if any.
+    pub fn get_resale_listing(
+        env: Env,
+        payment_id: String,
+    ) -> Option<crate::resale::ResaleListing> {
+        crate::resale::get_resale_listing(&env, payment_id)
     }
 
     /// Triggers a bulk refund for a cancelled event. Processes in batches.

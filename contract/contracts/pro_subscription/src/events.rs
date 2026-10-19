@@ -22,6 +22,8 @@ pub enum ProSubscriptionEvent {
     ProMemberAdded,
     /// Organizer removed from the pro members list
     ProMemberRemoved,
+    /// Contract admin updated
+    AdminUpdated,
 }
 
 /// Emitted when the contract is initialized
@@ -82,6 +84,18 @@ pub struct SubscriptionCancelledEvent {
     pub timestamp: u64,
 }
 
+/// Emitted when a Pro subscription is found to have expired.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubscriptionExpiredEvent {
+    /// The organizer whose subscription expired.
+    pub organizer: Address,
+    /// The ledger timestamp at which the subscription expired.
+    pub expires_at: u64,
+    /// Ledger timestamp when the expiration was observed.
+    pub timestamp: u64,
+}
+
 /// Emitted when the pro monthly price is updated
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -113,5 +127,19 @@ pub struct ProMemberRemovedEvent {
     /// The organizer's wallet address
     pub organizer: Address,
     /// Ledger timestamp of the event
+    pub timestamp: u64,
+}
+
+/// Emitted when the contract admin is updated
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminUpdatedEvent {
+    /// The previous admin address
+    pub old_admin: Address,
+    /// The new admin address
+    pub new_admin: Address,
+    /// The address that performed the update (the previous admin)
+    pub updated_by: Address,
+    /// Ledger timestamp of the update
     pub timestamp: u64,
 }

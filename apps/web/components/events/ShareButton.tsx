@@ -4,9 +4,11 @@ import React from "react";
 import useIsMobile from "@/hooks/useIsMobile";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 export default function ShareButton({ title, text }: { title: string; text: string }) {
   const isMobile = useIsMobile();
+  const t = useTranslations("eventDetail");
 
   const handleShare = async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -31,6 +33,13 @@ export default function ShareButton({ title, text }: { title: string; text: stri
         toast.success("Link copied to clipboard");
       }
     } catch (err) {
+      // User cancelled the native share sheet — not an error.
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
       toast.error("Unable to share link");
     }
   };
@@ -40,14 +49,14 @@ export default function ShareButton({ title, text }: { title: string; text: stri
     // but we provide graceful fallback visible on desktop as well.
     return (
       <Button variant="ghost" onClick={handleShare} className="px-4 py-2">
-        Share
+        {t("share")}
       </Button>
     );
   }
 
   return (
     <Button variant="ghost" onClick={handleShare} className="px-4 py-2">
-      Share
+      {t("share")}
     </Button>
   );
 }

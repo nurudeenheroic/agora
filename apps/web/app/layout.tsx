@@ -5,10 +5,11 @@
 //   toast.info("Loading...")
 // Toaster is globally mounted below — no per-page setup needed.
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { CookieBanner } from "@/components/layout/cookie-banner";
 import { LiveAnnouncer } from "@/components/ui/live-announcer";
+import { LocaleProvider } from "@/lib/i18n/locale-context";
 import "./globals.css";
 
 const inter = Inter({
@@ -40,10 +41,19 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FFFBE9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f1115" },
+  ],
+};
+
 import { Suspense } from "react";
 import LoadingBar from "@/components/ui/loading-bar";
 import { ThemeProvider } from "@/components/providers/theme-context";
 import { AttributionCapture } from "@/components/analytics/attribution-capture";
+import { TestnetBanner } from "@/components/layout/testnet-banner";
+import { NetworkProvider } from "@/lib/stellar/network-context";
 
 export default function RootLayout({
   children,
@@ -51,14 +61,45 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased`}>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var theme = localStorage.getItem("theme");
+                if (!theme) {
+                  theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                }
+                document.documentElement.setAttribute("data-theme", theme);
+              })();
+            `,
+          }}
+        />
         <a className="skip-link" href="#main-content">
           Skip to main content
         </a>
-        <LiveAnnouncer />
-        {children}
-        <CookieBanner />
+        <LocaleProvider>
+          {/* ThemeProvider — pre-existing bug fix (Issue #1541 batch):
+              this was imported but never actually mounted, so any component
+              calling useTheme() (e.g. GuestNav's theme toggle) would throw.
+              Wiring it here is unrelated to the network switcher below but
+              was needed since GuestNav also renders the new NetworkSwitcher. */}
+          <ThemeProvider>
+            {/* NetworkProvider — Issue #1541. Makes the active
+                Testnet/Mainnet selection available to the header's
+                NetworkSwitcher (and anything else) app-wide. */}
+            <NetworkProvider>
+              <LiveAnnouncer />
+              {/* Testnet warning banner — Issue #1491.
+                  TestnetBanner is a client component that self-gates on
+                  NEXT_PUBLIC_STELLAR_NETWORK so it renders nothing in production. */}
+              <TestnetBanner />
+              {children}
+              <CookieBanner />
+            </NetworkProvider>
+          </ThemeProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

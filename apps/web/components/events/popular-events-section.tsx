@@ -8,6 +8,7 @@ import { EventCardSkeleton } from "./event-card-skeleton";
 import { EmptyState } from "../ui/empty-state";
 import { Button } from "../ui/button";
 import { dataEvents } from "./mockups";
+import { useTranslations } from "next-intl";
 import {
   FilterSidebar,
   FilterState,
@@ -48,6 +49,7 @@ const DEFAULT_FILTERS: FilterState = {
   locations: [],
   minPrice: "",
   maxPrice: "",
+  freeOnly: false,
 };
 
 interface PopularEventsSectionProps {
@@ -55,6 +57,8 @@ interface PopularEventsSectionProps {
   onCategoryChange: (category: string) => void;
   selectedOrganizer?: string;
   onOrganizerChange?: (organizer: string) => void;
+  free?: boolean;
+  onFreeChange?: (free: boolean) => void;
 }
 
 type ActiveFilter = {
@@ -68,7 +72,10 @@ export function PopularEventsSection({
   onCategoryChange,
   selectedOrganizer,
   onOrganizerChange,
+  free,
+  onFreeChange,
 }: PopularEventsSectionProps) {
+  const t = useTranslations("discover");
   const [isFocused, setIsFocused] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, SEARCH_DEBOUNCE_MS);
@@ -76,6 +83,7 @@ export function PopularEventsSection({
   const [filters, setFilters] = useState<FilterState>({
     ...DEFAULT_FILTERS,
     categories: category ? [category] : [],
+    freeOnly: free ?? false,
   });
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -130,16 +138,20 @@ export function PopularEventsSection({
     setFilters((currentFilters) => ({
       ...currentFilters,
       categories: category ? [category] : [],
+      freeOnly: free ?? false,
     }));
-  }, [category]);
+  }, [category, free]);
 
   const handleFiltersChange = (nextFilters: FilterState) => {
     setFilters(nextFilters);
     onCategoryChange(nextFilters.categories[0] ?? "");
+    if (onFreeChange) {
+      onFreeChange(nextFilters.freeOnly);
+    }
   };
 
   const activeFilters: ActiveFilter[] = [
-    ...(filters.date && filters.date !== "Any time"
+    ...(filters.date && filters.date !== t("anyTime")
       ? [{ key: "date" as const, label: filters.date }]
       : []),
     ...filters.categories.map((category) => ({
@@ -158,12 +170,17 @@ export function PopularEventsSection({
     ...(filters.maxPrice
       ? [{ key: "maxPrice" as const, label: `Up to $${filters.maxPrice}` }]
       : []),
+    ...(filters.freeOnly
+      ? [{ key: "freeOnly" as const, label: "Free events only" }]
+      : []),
   ];
 
   const removeFilter = (filter: ActiveFilter) => {
     const nextFilters = { ...filters };
 
-    if (filter.key === "categories" || filter.key === "locations") {
+    if (filter.key === "freeOnly") {
+      nextFilters.freeOnly = false;
+    } else if (filter.key === "categories" || filter.key === "locations") {
       nextFilters[filter.key] = nextFilters[filter.key].filter(
         (value) => value !== filter.value,
       );
@@ -217,6 +234,14 @@ export function PopularEventsSection({
       });
     }
 
+    // 5. Free events only
+    if (filters.freeOnly) {
+      result = result.filter((event) => {
+        const isFree = event.price.toLowerCase() === "free" || parseFloat(event.price) === 0;
+        return isFree;
+      });
+    }
+
     return sortEvents(result, sortBy);
   }, [debouncedSearch, filters, events, activeCategory, sortBy]);
 
@@ -267,7 +292,8 @@ export function PopularEventsSection({
     (filters.date ? 1 : 0) +
     filters.categories.length +
     filters.locations.length +
-    (filters.minPrice !== "" || filters.maxPrice !== "" ? 1 : 0);
+    (filters.minPrice !== "" || filters.maxPrice !== "" ? 1 : 0) +
+    (filters.freeOnly ? 1 : 0);
 
   return (
     <section ref={gridSectionRef} className="px-4 bg-base py-12">
@@ -275,7 +301,7 @@ export function PopularEventsSection({
         {getActiveFilterCount(filters) > 0 && (
           <div
             className="flex flex-wrap items-center gap-2 mb-6"
-            aria-label="Active filters"
+            aria-label={t("activeFilters")}
           >
             {activeFilters.map((filter) => (
               <span
@@ -341,7 +367,7 @@ export function PopularEventsSection({
                 className="pl-13 h-9.75 rounded-4xl bg-black pr-9 py-2 text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-white focus:outline-2 focus:-outline-offset-2 focus:outline-[#FDDA23]"
                 type="text"
                 placeholder="Search"
-                aria-label="Search events"
+                aria-label={t("searchEvents")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onFocus={() => setIsFocused(true)}
@@ -372,7 +398,7 @@ export function PopularEventsSection({
                 id="discover-sort"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as EventSort)}
-                aria-label="Sort events"
+                aria-label={t("sortEvents")}
                 className="h-9.75 max-w-[10.5rem] sm:max-w-none rounded-4xl bg-black px-3 text-sm text-white outline-1 -outline-offset-1 outline-white/10 focus:outline-2 focus:-outline-offset-2 focus:outline-[#FDDA23]"
               >
                 {SORT_OPTIONS.map((option) => (
@@ -427,7 +453,7 @@ export function PopularEventsSection({
                 className="w-full pl-10 pr-9 h-9.75 rounded-4xl bg-black py-2 text-sm text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-white/70 focus:outline-2 focus:-outline-offset-2 focus:outline-[#FDDA23]"
                 type="text"
                 placeholder="Search events"
-                aria-label="Search events"
+                aria-label={t("searchEvents")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -517,7 +543,7 @@ export function PopularEventsSection({
                 }
                 title="No events found"
                 description="Try adjusting your search or filters to find what you're looking for."
-                action={{ label: "Clear Search", onClick: () => setSearch("") }}
+                action={{ label: t("clearSearch"), onClick: () => setSearch("") }}
               />
             </div>
           )}
