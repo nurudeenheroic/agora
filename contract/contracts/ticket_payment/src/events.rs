@@ -1,3 +1,5 @@
+// Contract event payload types – not part of the primary documentation surface.
+#![allow(missing_docs)]
 use crate::types::PaymentStatus;
 use soroban_sdk::{contracttype, Address, BytesN, String};
 
@@ -25,17 +27,16 @@ pub enum AgoraEvent {
     ProposalVoted,
     GovernanceActionExecuted,
     ContractVerificationFailed,
-    EventCancelled,
-    CancellationRefundClaimed,
-    PoapMinted,
     ResaleListed,
     ResaleCancelled,
     ResalePurchased,
-    MilestoneReleased,
+    PoapMinted,
+    EventCancelled,
+    CancellationRefundClaimed,
     EscrowWithdrawalProposed,
     EscrowWithdrawalApproved,
     EscrowWithdrawalExecuted,
-    EscrowDisputed,
+    MilestoneReleased,
 }
 
 #[contracttype]
@@ -222,6 +223,34 @@ pub struct GovernanceActionExecutedEvent {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResaleListedEvent {
+    pub payment_id: String,
+    pub seller: Address,
+    pub ask_price: i128,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResaleCancelledEvent {
+    pub payment_id: String,
+    pub seller: Address,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResalePurchasedEvent {
+    pub payment_id: String,
+    pub seller: Address,
+    pub buyer: Address,
+    pub price: i128,
+    pub royalty: i128,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContractVerificationFailedEvent {
     pub missing_key: String,
     pub timestamp: u64,
@@ -255,45 +284,6 @@ pub struct PoapMintedEvent {
     /// The attendee who earned the POAP.
     pub attendee: Address,
     /// Ledger timestamp at mint time.
-    pub timestamp: u64,
-}
-
-/// Emitted when a ticket holder lists their ticket on the secondary market.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ResaleListedEvent {
-    pub payment_id: String,
-    pub event_id: String,
-    pub seller: Address,
-    /// Asking price in token base units.
-    pub price: i128,
-    /// The cap this listing was validated against, so indexers can show
-    /// how much headroom the organizer allows without re-reading the registry.
-    pub max_price: i128,
-    pub timestamp: u64,
-}
-
-/// Emitted when a seller withdraws their own listing before it sells.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ResaleCancelledEvent {
-    pub payment_id: String,
-    pub event_id: String,
-    pub seller: Address,
-    pub timestamp: u64,
-}
-
-/// Emitted on a completed atomic resale: payment settled and ownership moved.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ResalePurchasedEvent {
-    pub payment_id: String,
-    pub event_id: String,
-    pub seller: Address,
-    pub buyer: Address,
-    pub price: i128,
-    pub royalty: i128,
-    pub seller_proceeds: i128,
     pub timestamp: u64,
 }
 
