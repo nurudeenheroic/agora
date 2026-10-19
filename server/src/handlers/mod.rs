@@ -1,6 +1,10 @@
+pub mod affiliates;
+pub mod api_keys;
 pub mod auth;
 pub mod categories;
 pub mod events;
+pub mod follows;
+pub mod geo;
 pub mod governance;
 pub mod health;
 pub mod indexer;
@@ -11,9 +15,12 @@ pub mod pricing;
 pub mod profile;
 pub mod qr_payload;
 pub mod rates;
+pub mod recommendations;
 pub mod soroban_listener;
 pub mod sync;
+pub mod tickets;
 pub mod waiting_room;
+pub mod webhooks;
 pub mod ws;
 pub mod zk_checkin;
 

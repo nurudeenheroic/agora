@@ -113,6 +113,12 @@ impl CircuitBreaker {
             let now = unix_now();
             // CAS: only set `opened_at` when it is currently zero (not already
             // open) to avoid resetting the timer mid-open window.
+            let _ = self.opened_at.compare_exchange(
+                0,
+                now,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            );
             let _ = self
                 .opened_at
                 .compare_exchange(0, now, Ordering::AcqRel, Ordering::Relaxed);
@@ -262,6 +268,13 @@ pub async fn get_rates(
         );
 
         if let Ok(Some(stale_rate)) = state.redis.get::<ExchangeRate>(&stale_key).await {
+            let mut resp =
+                success(stale_rate.clone(), "Stale exchange rate served (circuit breaker open)")
+                    .into_response();
+            resp.headers_mut().insert(
+                "X-Rate-Source",
+                HeaderValue::from_static("stale-cache"),
+            );
             let mut resp = success(
                 stale_rate,
                 "Stale exchange rate served (circuit breaker open)",
