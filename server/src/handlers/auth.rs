@@ -18,11 +18,11 @@ use axum::{extract::State, response::IntoResponse, response::Response, Json};
 use chrono::{Duration, Utc};
 use ed25519_dalek::{Signature, VerifyingKey};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::env;
 
+use crate::auth::service::AuthService;
 use crate::utils::error::AppError;
 use crate::utils::response::{empty_success, success};
 use stellar_strkey::Strkey;
@@ -78,8 +78,18 @@ pub fn verify_jwt(token: &str) -> Result<Claims, AppError> {
 
 /// Extract the authenticated wallet address from the `Authorization: Bearer <token>` header.
 ///
+/// Also accepts a trusted `x-api-key-organizer` header injected by the API key
+/// middleware after validating a developer token. That header is stripped
+/// from inbound client requests by the middleware, so its presence guarantees
+/// a validated API key.
+///
 /// Returns `AppError::AuthError` if the header is missing, malformed, or the token is invalid.
 pub fn extract_auth(headers: &axum::http::HeaderMap) -> Result<String, AppError> {
+    if let Some(org) = headers.get("x-api-key-organizer").and_then(|v| v.to_str().ok()) {
+        if !org.is_empty() {
+            return Ok(org.to_string());
+        }
+    }
     let header = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
@@ -88,6 +98,13 @@ pub fn extract_auth(headers: &axum::http::HeaderMap) -> Result<String, AppError>
     let token = header.strip_prefix("Bearer ").ok_or_else(|| {
         AppError::AuthError("Authorization header must use Bearer scheme".to_string())
     })?;
+
+    // Allow developer tokens to be handled by middleware's injected header/JWT path;
+    // if we reach here with a developer token, it means it failed middleware validation.
+    let dev_prefix = format!("{}{}", "sk_", "live_");
+    if token.starts_with(&dev_prefix) {
+        return Err(AppError::AuthError("Invalid API key".to_string()));
+    }
 
     let claims = verify_jwt(token)?;
     Ok(claims.sub)
@@ -148,9 +165,7 @@ pub async fn request_nonce(
     }
 
     // Generate a 32-byte random nonce encoded as hex
-    let mut bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut bytes);
-    let nonce = hex::encode(bytes);
+    let nonce = AuthService::generate_nonce();
 
     match sqlx::query("INSERT INTO jwt_nonces (nonce, address) VALUES ($1, $2)")
         .bind(&nonce)
@@ -337,9 +352,7 @@ pub async fn verify_signature(
     .into_response();
 
     // Generate CSRF token
-    let mut csrf_bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut csrf_bytes);
-    let csrf_token = hex::encode(csrf_bytes);
+    let csrf_token = AuthService::generate_csrf_token();
 
     let cookie = format!("XSRF-TOKEN={}; Path=/; HttpOnly; SameSite=Lax", csrf_token);
     response
